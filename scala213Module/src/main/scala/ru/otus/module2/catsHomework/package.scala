@@ -1,5 +1,7 @@
 package ru.otus.module2
 
+import cats.Functor
+
 package object catsHomework {
 
   /**
@@ -16,7 +18,12 @@ package object catsHomework {
    * Проверьте, что код работает корректно для Branch и Leaf
    */
 
-   lazy val treeFunctor = ???
+   lazy val treeFunctor: Functor[Tree] = new Functor[Tree] {
+     override def map[A, B](fa: Tree[A])(f: A => B): Tree[B] = fa match {
+       case Leaf(value) => Leaf(f(value))
+       case Branch(left, right) => Branch(map(left)(f), map(right)(f))
+     }
+   }
 
   /**
    * Monad абстракция для последовательной
@@ -61,7 +68,7 @@ package object catsHomework {
    * где в качестве типа ошибки будет String
    */
 
-   val eitherME = ???
+   lazy val eitherME = ???
 
 
 }
