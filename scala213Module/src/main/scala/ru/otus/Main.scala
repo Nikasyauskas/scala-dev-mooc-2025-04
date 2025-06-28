@@ -1,6 +1,6 @@
 package ru.otus
 
-import ru.otus.module2.catsHomework.{Branch, Leaf, treeFunctor, tryME}
+import ru.otus.module2.catsHomework.{Branch, Leaf, treeFunctor, tryME, eitherME}
 
 import scala.util.{Failure, Success}
 
@@ -16,7 +16,7 @@ object Main {
     val modifaedTree1 = treeFunctor.map(tree)(_ + 1)
     println(modifaedTree1)
 
-    // MonadError
+    // Try MonadError
 
     println(tryME.flatMap(Success(2))((x: Int) => Success(x + 3)))
     println(tryME.flatMap(Failure(new Exception("error")))((x: Int) => Success(x + 1)))
@@ -39,6 +39,28 @@ object Main {
     println(tryME.ensure(successTry)(new Exception("Number too small"))(_ > 3))
     println(tryME.ensure(successTry)(new Exception("Number too small"))(_ > 10))
 
+    // Either MonadError
     
+    println(eitherME.flatMap(Right(2))((x: Int) => Right(x + 3)))
+    println(eitherME.flatMap(Left("error"))((x: Int) => Right(x + 1)))
+    println(eitherME.pure(42))
+    println(eitherME.raiseError("Custom error"))
+
+    val errorEither = Left("Original error")
+    val handledWithRecoveryEither = eitherME.handleErrorWith(errorEither) { e =>
+      println(s"Handling error: $e")
+      Right(42)
+    }
+    println(handledWithRecoveryEither)
+
+    val handledErrorEither = eitherME.handleError(errorEither) { e =>
+      println(s"Recovering from: $e")
+      100
+    }
+    println(handledErrorEither)
+
+    val successEither = Right(5)
+    println(eitherME.ensure(successEither)("Number too small")(_ > 3))
+    println(eitherME.ensure(successEither)("Number too small")(_ > 10))
   }
 } 

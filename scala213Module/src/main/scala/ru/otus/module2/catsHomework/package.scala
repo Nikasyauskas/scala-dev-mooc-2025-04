@@ -82,27 +82,34 @@ package object catsHomework {
    * Напишите instance MonadError для Either,
    * где в качестве типа ошибки будет String
    */
-  //  lazy val eitherME = new MonadError[Either[String, A], String] {
-  //    override def flatMap[A, B](fa: Either[String, A])(f: A => Either[String, B]): Either[String, B] = 
-  //      fa.flatMap(f)
-  //    override def pure[A](v: A): Either[String, A] = 
-  //      Right(v)
-  //    override def raiseError[A](e: String): Either[String, A] = 
-  //      Left(e)
-  //    override def handleErrorWith[A](fa: Either[String, A])(f: String => Either[String, A]): Either[String, A] = 
-  //      fa match {
-  //        case Left(e) => f(e)
-  //        case Right(a) => Right(a)
-  //      }
-  //    override def handleError[A](fa: Either[String, A])(f: String => A): Either[String, A] = 
-  //      fa match {
-  //        case Left(e) => Right(f(e))
-  //        case Right(a) => Right(a)
-  //      }
-  //    override def ensure[A](fa: Either[String, A])(e: String)(f: A => Boolean): Either[String, A] = 
-  //      fa match {
-  //        case Left(err) => Left(err)
-  //        case Right(a) => if (f(a)) Right(a) else Left(e)
-  //      }
-  //  }
+
+   type EitherString[A] = Either[String, A]
+
+   lazy val eitherME = new MonadError[EitherString, String] {
+
+     override def flatMap[A, B](fa: Either[String, A])(f: A => Either[String, B]): Either[String, B] = fa.flatMap(f)
+
+     override def pure[A](v: A): Either[String, A] = Right(v)
+
+     override def raiseError[A](e: String): Either[String, A] = Left(e)
+
+     override def handleErrorWith[A](fa: Either[String, A])(f: String => Either[String, A]): Either[String, A] = 
+       fa match {
+         case Left(e) => f(e)
+         case Right(a) => Right(a)
+       }
+
+     override def handleError[A](fa: Either[String, A])(f: String => A): Either[String, A] = 
+       fa match {
+         case Left(e) => Right(f(e))
+         case Right(a) => Right(a)
+       }
+
+     override def ensure[A](fa: Either[String, A])(e: String)(f: A => Boolean): Either[String, A] = 
+       fa match {
+         case Left(err) => Left(err)
+         case Right(a) => if (f(a)) Right(a) else Left(e)
+       }
+
+   }
 }
