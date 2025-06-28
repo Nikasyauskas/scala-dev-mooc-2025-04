@@ -39,7 +39,7 @@ object functional_effects {
        * 1. Объявить исполняемую модель Console
        */
 
-      case class Console[A](run: () => A, debug: () => List[String]) {
+      case class Console[A](run: () => A) {
         def map[B](f: A => B): Console[B] = flatMap(a => Console.succeed(f(a)))
         def flatMap[B](f: A => Console[B]): Console[B] =
           Console.succeed(f(this.run()).run())
