@@ -1,5 +1,8 @@
 package ru.otus.module2
 
+import cats.Functor
+import scala.util.{Try, Success, Failure}
+
 package object catsHomework {
 
   /**
@@ -16,7 +19,12 @@ package object catsHomework {
    * Проверьте, что код работает корректно для Branch и Leaf
    */
 
-   lazy val treeFunctor = ???
+   lazy val treeFunctor: Functor[Tree] = new Functor[Tree] {
+     override def map[A, B](fa: Tree[A])(f: A => B): Tree[B] = fa match {
+       case Leaf(value) => Leaf(f(value))
+       case Branch(left, right) => Branch(map(left)(f), map(right)(f))
+     }
+   }
 
   /**
    * Monad абстракция для последовательной
@@ -53,15 +61,55 @@ package object catsHomework {
   /**
    * Напишите instance MonadError для Try
    */
+   lazy val tryME = new MonadError[Try, Throwable] {
+     override def flatMap[A, B](fa: Try[A])(f: A => Try[B]): Try[B] = fa.flatMap(f)
 
-   lazy val tryME = ???
+     override def pure[A](v: A): Try[A] = Success(v)
+     
+     override def raiseError[A](e: Throwable): Try[A] = Failure(e)
+     
+     override def handleErrorWith[A](fa: Try[A])(f: Throwable => Try[A]): Try[A] = 
+      fa.recoverWith { case e => f(e) }
+     
+     override def handleError[A](fa: Try[A])(f: Throwable => A): Try[A] = 
+       fa.recover { case e => f(e) }
+     
+     override def ensure[A](fa: Try[A])(e: Throwable)(f: A => Boolean): Try[A] = 
+       fa.filter(f).recoverWith { case _ => Failure(e) }
+   }
 
   /**
    * Напишите instance MonadError для Either,
    * где в качестве типа ошибки будет String
    */
 
-   val eitherME = ???
+   type EitherString[A] = Either[String, A]
 
+   lazy val eitherME = new MonadError[EitherString, String] {
 
+     override def flatMap[A, B](fa: Either[String, A])(f: A => Either[String, B]): Either[String, B] = fa.flatMap(f)
+
+     override def pure[A](v: A): Either[String, A] = Right(v)
+
+     override def raiseError[A](e: String): Either[String, A] = Left(e)
+
+     override def handleErrorWith[A](fa: Either[String, A])(f: String => Either[String, A]): Either[String, A] = 
+       fa match {
+         case Left(e) => f(e)
+         case Right(a) => Right(a)
+       }
+
+     override def handleError[A](fa: Either[String, A])(f: String => A): Either[String, A] = 
+       fa match {
+         case Left(e) => Right(f(e))
+         case Right(a) => Right(a)
+       }
+
+     override def ensure[A](fa: Either[String, A])(e: String)(f: A => Boolean): Either[String, A] = 
+       fa match {
+         case Left(err) => Left(err)
+         case Right(a) => if (f(a)) Right(a) else Left(e)
+       }
+
+   }
 }
