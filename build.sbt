@@ -1,3 +1,5 @@
+name := "scala-dev-mooc-2025-04"
+
 lazy val root = (project in file("."))
   .aggregate(scala213Module, scala3Module)
 
@@ -6,7 +8,7 @@ lazy val scala213Module = (project in file("scala213Module"))
     name := "Scala 2.13 Module",
     scalaVersion := "2.13.16",
     libraryDependencies ++= Seq(Dependencies.CatsCore, Dependencies.ScalaTest) ++
-      Dependencies.ZIO
+      Dependencies.ZIO ++ Dependencies.ZioConfig
   )
 
 lazy val scala3Module = (project in file("scala3Module"))

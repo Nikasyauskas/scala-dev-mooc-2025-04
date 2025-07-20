@@ -15,7 +15,7 @@ object ZioApp {
       // println(zioRecursion.factorial(Number))
 
       Unsafe.unsafe { implicit u =>
-        zio.Runtime.default.unsafe.run(ZIO.scoped(zioScope.cc))      }
+        zio.Runtime.default.unsafe.run(di.z8)      }
   }
 
 }
