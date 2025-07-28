@@ -7,7 +7,7 @@ lazy val scala213Module = (project in file("scala213Module"))
   .settings(
     name := "Scala 2.13 Module",
     scalaVersion := "2.13.16",
-    libraryDependencies ++= Seq(Dependencies.CatsCore, Dependencies.ScalaTest) ++
+    libraryDependencies ++= Seq(Dependencies.CatsCore, Dependencies.ScalaTest, Dependencies.CatsEffect) ++
       Dependencies.ZIO ++ Dependencies.ZioConfig
   )
 
