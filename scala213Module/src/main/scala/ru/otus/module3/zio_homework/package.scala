@@ -145,13 +145,15 @@ package object zio_homework {
      * 
      */
 
-  lazy val appWithTimeLogg = ???
+  lazy val appWithTimeLogg: ZIO[Clock with TimingService, IOException, Int] = for {
+    timingService <- ZIO.service[TimingService]
+    result <- timingService.timeEffect(app)
+  } yield result
 
   /**
     * 
-    * 7Подготовьте его к запуску и затем запустите воспользовавшись ZioHomeWorkApp
+    * Подготовьте его к запуску и затем запустите воспользовавшись ZioHomeWorkApp
     */
-
-  lazy val runApp = ???
+  lazy val runApp: ZIO[Clock with TimingService, IOException, Int] = appWithTimeLogg.provide(TimingServiceLayer.live, ZLayer.succeed(Clock.ClockLive))
 
 }
