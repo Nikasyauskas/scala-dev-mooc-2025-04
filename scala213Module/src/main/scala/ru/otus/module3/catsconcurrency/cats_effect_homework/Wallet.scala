@@ -3,7 +3,8 @@ package ru.otus.module3.catsconcurrency.cats_effect_homework
 import cats.effect.Sync
 import cats.implicits._
 import Wallet._
-import java.nio.file.{Files, Paths}
+
+import java.nio.file.{Files, Path, Paths}
 import java.nio.charset.StandardCharsets
 
 // DSL управления электронным кошельком
@@ -27,9 +28,8 @@ trait Wallet[F[_]] {
 // - java.nio.file.Files.exists
 // - java.nio.file.Paths.get
 final class FileWallet[F[_]: Sync](id: WalletId) extends Wallet[F] {
-  private val filePath = Paths.get(s"$id.txt")
-  
-  private def readBalanceFromFile: BigDecimal = {
+
+  private def readFile(filePath: Path): BigDecimal = {
     if (Files.exists(filePath)) {
       val content = Files.readString(filePath, StandardCharsets.UTF_8)
       if (content.trim.isEmpty) BigDecimal(0) else BigDecimal(content.trim)
@@ -37,27 +37,35 @@ final class FileWallet[F[_]: Sync](id: WalletId) extends Wallet[F] {
       BigDecimal(0)
     }
   }
-  
-  def balance: F[BigDecimal] = Sync[F].delay {
-    readBalanceFromFile
-  }
-  
-  def topup(amount: BigDecimal): F[Unit] = Sync[F].delay {
-    val currentBalance = readBalanceFromFile
-    val newBalance = currentBalance + amount
+
+  private def writeFile(filePath: Path, newBalance: BigDecimal): Unit = {
     Files.write(filePath, newBalance.toString.getBytes(StandardCharsets.UTF_8))
   }
-  
-  def withdraw(amount: BigDecimal): F[Either[WalletError, Unit]] = Sync[F].delay {
-    val currentBalance = readBalanceFromFile
-    if (currentBalance >= amount) {
-      val newBalance = currentBalance - amount
-      Files.write(filePath, newBalance.toString.getBytes(StandardCharsets.UTF_8))
-      Right(())
-    } else {
-      Left(BalanceTooLow)
+
+  def balance: F[BigDecimal] = for {
+    balance <- Sync[F].delay { readFile(Paths.get(id)) }
+    _ <- Sync[F].delay { writeFile(Paths.get(id), balance) }
+  } yield balance
+
+  def topup(amount: BigDecimal): F[Unit] = for {
+    balance <- balance
+    updatedBalance <- Sync[F].delay { balance + amount }
+    _ <- Sync[F].delay { writeFile(Paths.get(id), updatedBalance) }
+  } yield updatedBalance
+
+  def withdraw(amount: BigDecimal): F[Either[WalletError, Unit]] = for {
+    currentBalance <- balance
+    result <- Sync[F].delay {
+      if (currentBalance >= amount) {
+        val newBalance = currentBalance - amount
+        writeFile(Paths.get(id), newBalance)
+        Right(())
+      } else {
+        Left(BalanceTooLow)
+      }
     }
-  }
+  } yield result
+
 }
 
 object Wallet {
