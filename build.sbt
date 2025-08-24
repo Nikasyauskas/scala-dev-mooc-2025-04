@@ -7,9 +7,18 @@ lazy val scala213Module = (project in file("scala213Module"))
   .settings(
     name := "Scala 2.13 Module",
     scalaVersion := "2.13.16",
-    libraryDependencies ++= Seq(Dependencies.CatsCore, Dependencies.ScalaTest, Dependencies.CatsEffect) ++
+    libraryDependencies ++= Seq(
+      Dependencies.CatsCore,
+      Dependencies.ScalaTest,
+      Dependencies.CatsEffect,
+      Dependencies.zioHttp,
+      Dependencies.liquibase,
+      Dependencies.postgres,
+      Dependencies.logback
+    ) ++
       Dependencies.AKKA ++
-      Dependencies.ZIO ++ Dependencies.ZioConfig ++ Dependencies.fs2 ++ Dependencies.http4s
+      Dependencies.ZIO ++ Dependencies.ZioConfig ++
+      Dependencies.fs2 ++ Dependencies.http4s ++ Dependencies.quill ++ Dependencies.testContainers ++ Dependencies.circe
   )
 
 lazy val scala3Module = (project in file("scala3Module"))

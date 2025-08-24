@@ -1,5 +1,16 @@
-package ru.otus.module4.catsmiddleware
+package ru.otus.module4.http4sstreamingjson
 
+import cats.data.{Kleisli, OptionT}
+import cats.effect.kernel.Ref
+import org.http4s.ember.client.EmberClientBuilder
+import cats.effect.{IO, IOApp, Resource}
+import org.http4s.client.Client
+import org.http4s.{AuthedRequest, AuthedRoutes, HttpRoutes, Request, Response, Status, Uri}
+import cats.{Functor, effect}
+import com.comcast.ip4s.{Host, Port}
+import org.http4s.dsl.io.{->, /, Forbidden, GET, Ok, PUT, Root}
+import org.http4s.ember.server.EmberServerBuilder
+import org.http4s.server.{AuthMiddleware, Router}
 import cats.Functor
 import cats.data.{Kleisli, OptionT}
 import cats.effect.kernel.Ref
@@ -12,7 +23,6 @@ import org.http4s.server.{AuthMiddleware, Router}
 import org.typelevel.ci.CIStringSyntax
 import org.http4s.{Method, Request, Status, Uri}
 import cats.implicits.toSemigroupKOps
-
 
 object Restfull {
   val service: HttpRoutes[IO] = HttpRoutes.of {
@@ -144,29 +154,54 @@ object Restfull {
 
 }
 
-object mainServer extends IOApp.Simple {
-  def run(): IO[Unit] = {
-    //Restfull.server.use(_=>IO.never)
-    //Restfull.server2.use(_=>IO.never)
-    //Restfull.serverSessionServer.use(_ => IO.never)
-    Restfull.serverSessionAuthServer.use(_ => IO.never)
-  }
+object HttpClient {
+  val builder: Resource[IO, Client[IO]] = EmberClientBuilder.default[IO].build
+  val request = Request[IO](uri = Uri.fromString("http://localhost:8081/hello").toOption.get)
+
+  //1
+  val result: Resource[IO, Response[IO]] = for {
+    client <- builder
+    response <- client.run(request)
+  } yield response
+
+  //2
+  val result1: Resource[IO, String] = for {
+    client <- builder
+    response <- effect.Resource.eval(client.expect[String](request))
+  } yield response
+
+  //3
+  val result3 = builder.use(
+    client => client.run(request).use(
+      resp =>
+        if (!resp.status.isSuccess)
+          resp.body.compile.to(Array).map(new String(_))
+        else
+          IO("error")
+    )
+
+  )
+
+
 }
 
-object Test extends IOApp.Simple {
-  def run: IO[Unit] = {
-    val server = Restfull.serviceHelloAuth
 
-    for {
-      result <- server(AuthedRequest(Restfull.User("sdf"), Request(method = Method.GET,
-        uri = Uri.fromString("/hello").toOption.get
-      ))).value
-      _ <- result match {
-        case Some(resp) =>
-          resp.bodyText.compile.last.flatMap(body => IO.println(resp.status.isSuccess) *> IO.println(body))
-        case None => IO.println("fail")
-      }
+object mainServer extends IOApp.Simple {
+  def run(): IO[Unit] = {
+    // for 1
+    /*    for {
+      fiber <- Restfull.server.use(_ => IO.never).start
+      _ <- HttpClient.result.use(IO.println)
+      _ <- fiber.join
+    } yield ()*/
 
-    } yield()
+    // for 2
+    /*for {
+      fiber <- Restfull.server.use(_ => IO.never).start
+      _ <- HttpClient.result1.use(IO.println)
+      _ <- fiber.join
+    } yield ()*/
+    //for 3
+    Restfull.server.use(_=>HttpClient.result3.flatMap(IO.println) *> IO.never)
   }
 }

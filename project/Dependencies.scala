@@ -39,7 +39,7 @@ object Dependencies {
   )
 
 
-  lazy val ZIOHttpVersion = "1.0.0.0-RC27"
+  lazy val ZIOHttpVersion = "3.3.3"
   lazy val LiquibaseVersion = "3.4.2"
   lazy val PostgresVersion = "42.3.1"
   lazy val LogbackVersion = "1.2.3"
@@ -70,7 +70,7 @@ object Dependencies {
     "org.http4s" %% "http4s-circe" % "0.23.14"
   )
 
-  lazy val zioHttp = "io.d11" %% "zhttp" % ZIOHttpVersion
+  lazy val zioHttp = "dev.zio" %% "zio-http" % ZIOHttpVersion
 
   lazy val quill = Seq(
     "io.getquill"          %% "quill-jdbc-zio" % "4.8.5"
