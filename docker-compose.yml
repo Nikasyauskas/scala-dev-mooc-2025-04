@@ -1,23 +1,43 @@
-version: "2"
+version: '3.8'
 
 services:
   postgres:
-    image: postgres:latest
+    image: postgres:16
     container_name: postgres
     environment:
-      - "TZ=Europe/Amsterdam"
-      - "POSTGRES_USER=docker"
-      - "POSTGRES_PASSWORD=docker"
+      - TZ=Europe/Amsterdam
+      - POSTGRES_USER=docker
+      - POSTGRES_PASSWORD=docker
     ports:
       - "5432:5432"
     volumes:
-      - "./sql:/docker-entrypoint-initdb.d"
+      - ./sql:/docker-entrypoint-initdb.d
+      - pgdata:/var/lib/postgresql/data
 
   cassandra:
-    image: cassandra:3
+    image: cassandra:3.11
     container_name: cassandra
-    ports:
-      - "7000:7000"
-      - "9042:9042"
     environment:
-      - "CASSANDRA_CLUSTER_NAME=OUR_DOCKERIZED_CASSANDRA_SINGLE_NODE_CLUSTER"
+      - CASSANDRA_LISTEN_ADDRESS=auto           # ok
+      - CASSANDRA_BROADCAST_ADDRESS=auto        # ok
+      - CASSANDRA_BROADCAST_RPC_ADDRESS=cassandra  # <-- фикс: НЕ auto
+      - CASSANDRA_CLUSTER_NAME=OUR_DOCKERIZED_CASSANDRA_SINGLE_NODE_CLUSTER
+      - CASSANDRA_SEEDS=cassandra
+      - MAX_HEAP_SIZE=1G
+      - HEAP_NEWSIZE=256M
+      - CASSANDRA_START_RPC=false
+      - CASSANDRA_ENDPOINT_SNITCH=SimpleSnitch
+    ports:
+      - "9042:9042"
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    healthcheck:
+      test: [ "CMD-SHELL", "cqlsh 127.0.0.1 9042 -e 'DESCRIBE KEYSPACES' >/dev/null 2>&1" ]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 90s
+
+volumes:
+  pgdata:
+  cassandra_data:
