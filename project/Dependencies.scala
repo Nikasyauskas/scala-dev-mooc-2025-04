@@ -19,6 +19,8 @@ object Dependencies {
   lazy val cassandraVersion   = "1.1.0"
   lazy val scalikejdbcVersion = "3.5.0"
   lazy val postgresVersion    = "42.2.2"
+  lazy val slickVersion       = "3.4.1"
+  lazy val alpakkaVersion     = "6.0.1"
 
   lazy val AKKA: Seq[ModuleID] = Seq(
     "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
@@ -36,6 +38,9 @@ object Dependencies {
     "org.postgresql"     % "postgresql"   % postgresVersion,
     "org.scalikejdbc"   %% "scalikejdbc"  % scalikejdbcVersion,
     "ch.qos.logback"     % "logback-classic" % "1.2.3",
+    "com.typesafe.slick" %% "slick" % slickVersion,
+    "com.typesafe.slick" %% "slick-hikaricp" % slickVersion,
+    "com.lightbend.akka" %% "akka-stream-alpakka-slick" % alpakkaVersion,
     "com.typesafe.akka" %% "akka-actor-testkit-typed" % akkaVersion % Test,
     "org.scalatest"     %% "scalatest" % "3.2.19" % Test
   )
