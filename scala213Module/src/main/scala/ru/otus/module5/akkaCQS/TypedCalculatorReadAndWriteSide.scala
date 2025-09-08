@@ -5,11 +5,16 @@ import akka.persistence.cassandra.query.scaladsl.CassandraReadJournal
 import akka.persistence.query.{EventEnvelope, PersistenceQuery}
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior}
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{Flow, GraphDSL, RunnableGraph, Sink, Source}
+import akka.stream.{ClosedShape, Materializer}
 import akka_typed.CalculatorRepository.{getLatestOffsetAndResult, initDatabase, updatedResultAndOffset}
 import akka_typed.TypedCalculatorWriteSide.{Add, Added, Command, Divide, Divided, Multiplied, Multiply}
 import com.typesafe.config.ConfigFactory
 import scalikejdbc.{ConnectionPool, ConnectionPoolSettings, DB, using}
+import slick.jdbc.PostgresProfile.api._
+import akka.stream.alpakka.slick.scaladsl.{Slick, SlickSession}
+import scala.concurrent.duration._
+import scala.concurrent.Await
 
 
 object  akka_typed{
@@ -20,24 +25,24 @@ object  akka_typed{
 
   object TypedCalculatorWriteSide{
     sealed trait Command
-    case class Add(amount: Int) extends Command
-    case class Multiply(amount: Int) extends Command
-    case class Divide(amount: Int) extends Command
+    case class Add(amount: Double) extends Command
+    case class Multiply(amount: Double) extends Command
+    case class Divide(amount: Double) extends Command
 
     sealed trait Event extends CborSerialization
-    case class Added(id:Int, amount: Int) extends Event
-    case class Multiplied(id:Int, amount: Int) extends Event
-    case class Divided(id:Int, amount: Int) extends Event
+    case class Added(id:Int, amount: Double) extends Event
+    case class Multiplied(id:Int, amount: Double) extends Event
+    case class Divided(id:Int, amount: Double) extends Event
 
-    final case class State(value:Int) extends CborSerialization
+    final case class State(value:Double) extends CborSerialization
     {
-      def add(amount: Int): State = copy(value = value + amount)
-      def multiply(amount: Int): State = copy(value = value * amount)
-      def divide(amount: Int): State = copy(value = value / amount)
+      def add(amount: Double): State = copy(value = value + amount)
+      def multiply(amount: Double): State = copy(value = value * amount)
+      def divide(amount: Double): State = copy(value = value / amount)
     }
 
     object State{
-      val empty = State(0)
+      val empty = State(0.0)
     }
 
 
@@ -100,6 +105,8 @@ object  akka_typed{
   }
 
 
+  case class Result(state: Double, offset: Long)
+
   case class TypedCalculatorReadSide(system: ActorSystem[NotUsed]) {
     initDatabase
 
@@ -111,23 +118,18 @@ object  akka_typed{
     val readJournal = PersistenceQuery(system).readJournalFor[CassandraReadJournal](
       CassandraReadJournal.Identifier)
 
-    /*
-   /**
-    * В read side приложения с архитектурой CQRS (объект TypedCalculatorReadSide в TypedCalculatorReadAndWriteSide.scala) необходимо разделить бизнес логику и запись в целевой получатель, т.е.
-    * 1) Persistence Query должно находиться в Source
-    * 2) Обновление состояния необходимо переместить в отдельный от записи в БД флоу
-    * 3) ! Задание со звездочкой: вместо CalculatorRepository создать Sink c любой БД (например Postgres из docker-compose файла).
-    * Для последнего задания пригодится документация - https://doc.akka.io/docs/alpakka/current/slick.html#using-a-slick-flow-or-sink
-    * Результат выполненного д.з. необходимо оформить либо на github gist либо PR к текущему репозиторию.
-    *
-    * */
-
-   как делать:
-   1. в типах int заменить на double
-   3. добавить функцию updateState в которой будет паттерн матчинг событий Added Multiplied Divided
-   4.создаете graphDsl  в котором: builder.add(source)
-   5. builder.add(Flow[EventEnvelope].map( e => updateState(e.event, e.seqNr)))
-    */
+    def updateState(event: Any, seqNum: Long): Result = {
+      val newState = event match {
+        case Added(_, amount) =>
+          latestCalculatedResult + amount
+        case Multiplied(_, amount) =>
+          latestCalculatedResult * amount
+        case Divided(_, amount) =>
+          latestCalculatedResult / amount
+      }
+      latestCalculatedResult = newState
+      Result(newState, seqNum)
+    }
 
 
 
@@ -135,96 +137,65 @@ object  akka_typed{
     val source: Source[EventEnvelope, NotUsed] =
       readJournal.eventsByPersistenceId("001", startOffset, Long.MaxValue)
 
-    /*
-   // homework, spoiler
-     def updateState(event: Any, seqNum: Long): Result ={
-       val newStste = event match {
-         case Added(_amount)=>
-           ???
-         case Multiplied(_,amount)=>
-           ???
-         case Divided(_amount)=>
-           ???
-       }
-       Result(newState, seqNum)
-     }
-
-     val graph = GraphDSL.create(){
-       implicit builder: GraphDSL.Builder[NotUsed] =>
-         //1.
-         val input = builder.add(source)
-         val stateUpdater = builder.add(Flow[EventEnvelope].map(e=> updateState(e.event, e.sequenceNr)))
-         val localSaveOutput = builder.add(Sink.foreach[Result]{
-           r=>
-             latestCalculatedResult = r.state
-             println("something to print")
-         })
-
-         val dbSaveOutput = builder.add(
-           Slick.sink[Result](r=> updatedResultAndOffset(r))
-         )
-
-         // надо разделить builder на 2  c помощью Broadcats
-         //см https://blog.rockthejvm.com/akka-streams-graphs/
-
-         //надо будет сохранить flow(разделенный на 2) в localSaveOutput и dbSaveOutput
-         //в конце закрыть граф и запустить его RunnableGraph.fromGraph(graph).run()
-
-
-
-
-     }*/
-
-    source.map{x=> println(x.toString())
-      x}
-      .runForeach{
-        event =>
-          event.event match {
-            case Added(_, amount) =>
-              latestCalculatedResult += amount
-              updatedResultAndOffset(latestCalculatedResult, event.sequenceNr)
-              println(s"Log from Added: $latestCalculatedResult")
-            case Multiplied(_, amount) =>
-              latestCalculatedResult *= amount
-              updatedResultAndOffset(latestCalculatedResult, event.sequenceNr)
-              println(s"Log from Multiplied: $latestCalculatedResult")
-            case Divided(_, amount) =>
-              latestCalculatedResult /= amount
-              updatedResultAndOffset(latestCalculatedResult, event.sequenceNr)
-              println(s"Log from Divided: $latestCalculatedResult")
+    // Create Slick session
+    implicit val slickSession: SlickSession = SlickSession.forConfig("slick-postgres")
+    
+    val graph = GraphDSL.create() {
+      implicit builder: GraphDSL.Builder[NotUsed] =>
+        import GraphDSL.Implicits._
+        
+        // 1. Source
+        val input = builder.add(source)
+        
+        // 2. State updater flow
+        val stateUpdater = builder.add(Flow[EventEnvelope].map(e => updateState(e.event, e.sequenceNr)))
+        
+        // 3. Local save output (for logging/state tracking)
+        val localSaveOutput = builder.add(Sink.foreach[Result] { r =>
+          latestCalculatedResult = r.state
+          println(s"Local state updated: ${r.state}, offset: ${r.offset}")
+        })
+        
+        // 4. Database save output using Slick
+        val dbSaveOutput = builder.add(
+          Slick.sink[Result] { (r: Result) =>
+            sqlu"UPDATE public.result SET calculated_value = ${r.state}, write_side_offset = ${r.offset} WHERE id = 1"
           }
-      }
+        )
+        
+        // 5. Broadcast to split the flow into two outputs
+        val broadcast = builder.add(akka.stream.scaladsl.Broadcast[Result](2))
+        
+        // 6. Connect the graph
+        input ~> stateUpdater ~> broadcast ~> localSaveOutput
+                              broadcast ~> dbSaveOutput
+        
+        ClosedShape
+    }
+    
+    // Run the graph
+    RunnableGraph.fromGraph(graph).run()
+
+
   }
 
   object CalculatorRepository {
-    //homework how to do
-    //1.
-    /*    def createSession(): SlickSession ={
-          //создайте сессию согласно документации
-        }*/
+    def createSession(): SlickSession = {
+      SlickSession.forConfig("slick-postgres")
+    }
+    
     def initDatabase(): Unit = {
       val poolSettings = ConnectionPoolSettings(initialSize = 10, maxSize = 100)
       ConnectionPool.singleton("jdbc:postgresql://localhost:5432/demo", "docker", "docker", poolSettings)
     }
 
-    // homework
-    // case class Result(state: Double, offset:Long)
-    /*    def getLatestsOffsetAndResult: Result ={
-          val query = sql"select * from public.result where id = 1;"
-            .as[Double]
-            .headOption
-          //надо создать future для db.run
-          //с помошью await получите результат или прокиньте ошибку если результат нет
-
-        }*/
-
-    def getLatestOffsetAndResult: (Int, Double) = {
+    def getLatestOffsetAndResult: (Long, Double) = {
       val entities =
         DB readOnly { session =>
           session.list("select * from public.result where id = 1;") {
             row =>
               (
-                row.int("write_side_offset"),
+                row.long("write_side_offset"),
                 row.double("calculated_value")
               )
           }
@@ -232,26 +203,25 @@ object  akka_typed{
       entities.head
     }
 
-    def updatedResultAndOffset(calcualted: Double, offset: Long): Unit =
-      {
-        using(DB(ConnectionPool.borrow())){
-          db =>
-            db.autoClose(true)
-            db.localTx{
-              _.update("update public.result set calculated_value=?, write_side_offset=? where id=1",
-                calcualted, offset)
-            }
-        }
+    def updatedResultAndOffset(calculated: Double, offset: Long): Unit = {
+      using(DB(ConnectionPool.borrow())){
+        db =>
+          db.autoClose(true)
+          db.localTx{
+            _.update("update public.result set calculated_value=?, write_side_offset=? where id=1",
+              calculated, offset)
+          }
       }
+    }
   }
 
   def apply(): Behavior[NotUsed] =
     Behaviors.setup{
       ctx =>
         val writeAcorRef = ctx.spawn(TypedCalculatorWriteSide(), "Calc", Props.empty)
-        writeAcorRef ! Add(10)
-        writeAcorRef ! Multiply(2)
-        writeAcorRef ! Divide(5)
+        writeAcorRef ! Add(10.0)
+        writeAcorRef ! Multiply(2.0)
+        writeAcorRef ! Divide(5.0)
 
         Behaviors.same
     }
