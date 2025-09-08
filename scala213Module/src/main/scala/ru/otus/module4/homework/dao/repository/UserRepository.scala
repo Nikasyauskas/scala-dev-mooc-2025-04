@@ -27,27 +27,54 @@ class UserRepositoryImpl extends UserRepository {
     val dc = db.Ctx
     import dc._
 
-    override def findUser(userId: UserId): QIO[Option[User]] = ???
+    override def findUser(userId: UserId): QIO[Option[User]] = 
+        run(query[User].filter(_.id == lift(userId.id))).map(_.headOption)
 
-    override def createUser(user: User): QIO[User] = ???
+    override def createUser(user: User): QIO[User] = 
+        run(query[User].insertValue(lift(user))).map(_ => user)
 
-    override def createUsers(users: List[User]): QIO[List[User]] = ???
+    override def createUsers(users: List[User]): QIO[List[User]] = 
+        run(liftQuery(users).foreach(u => query[User].insertValue(u))).map(_ => users)
 
-    override def updateUser(user: User): QIO[Unit] = ???
+    override def updateUser(user: User): QIO[Unit] = 
+        run(query[User].filter(_.id == lift(user.id)).updateValue(lift(user))).unit
 
-    override def deleteUser(user: User): QIO[Unit] = ???
+    override def deleteUser(user: User): QIO[Unit] = 
+        run(query[User].filter(_.id == lift(user.id)).delete).unit
 
-    override def findByLastName(lastName: String): QIO[List[User]] = ???
+    override def findByLastName(lastName: String): QIO[List[User]] = 
+        run(query[User].filter(_.lastName == lift(lastName)))
 
-    override def list(): QIO[List[User]] = ???
+    override def list(): QIO[List[User]] = 
+        run(query[User])
 
-    override def userRoles(userId: UserId): QIO[List[Role]] = ???
+    override def userRoles(userId: UserId): QIO[List[Role]] = 
+        run(
+            query[UserToRole]
+                .filter(_.userId == lift(userId.id))
+                .join(query[Role])
+                .on(_.roleId == _.code)
+                .map(_._2)
+        )
 
-    override def insertRoleToUser(roleCode: RoleCode, userId: UserId): QIO[Unit] = ???
+    override def insertRoleToUser(roleCode: RoleCode, userId: UserId): QIO[Unit] = 
+        run(
+            query[UserToRole].insertValue(
+                lift(UserToRole(roleCode.code, userId.id))
+            )
+        ).unit
 
-    override def listUsersWithRole(roleCode: RoleCode): QIO[List[User]] = ???
+    override def listUsersWithRole(roleCode: RoleCode): QIO[List[User]] = 
+        run(
+            query[UserToRole]
+                .filter(_.roleId == lift(roleCode.code))
+                .join(query[User])
+                .on(_.userId == _.id)
+                .map(_._2)
+        )
 
-    override def findRoleByCode(roleCode: RoleCode): QIO[Option[Role]] = ???
+    override def findRoleByCode(roleCode: RoleCode): QIO[Option[Role]] = 
+        run(query[Role].filter(_.code == lift(roleCode.code))).map(_.headOption)
 }
 
 object UserRepository{
