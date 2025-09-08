@@ -12,7 +12,7 @@ import akka_typed.TypedCalculatorWriteSide.{Add, Added, Command, Divide, Divided
 import com.typesafe.config.ConfigFactory
 import scalikejdbc.{ConnectionPool, ConnectionPoolSettings, DB, using}
 import slick.jdbc.PostgresProfile.api._
-import com.lightbend.akka.stream.alpakka.slick.scaladsl.{Slick, SlickSession}
+import akka.stream.alpakka.slick.scaladsl.{Slick, SlickSession}
 import scala.concurrent.duration._
 import scala.concurrent.Await
 
@@ -158,7 +158,7 @@ object  akka_typed{
         
         // 4. Database save output using Slick
         val dbSaveOutput = builder.add(
-          Slick.sink[Result] { r =>
+          Slick.sink[Result] { (r: Result) =>
             sqlu"UPDATE public.result SET calculated_value = ${r.state}, write_side_offset = ${r.offset} WHERE id = 1"
           }
         )
